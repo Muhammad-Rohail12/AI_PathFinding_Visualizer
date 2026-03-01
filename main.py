@@ -168,3 +168,99 @@ def algorithm(draw_func, grid, start, end, mode, heuristic_type):
     # If no path found
     draw_func(nodes_expanded, 0, compute_time * 1000)
     return None, nodes_expanded, 0, compute_time * 1000
+
+# ==========================================
+# 4. GUI, DRAWING, AND CONSOLE OUTPUT
+# ==========================================
+def make_grid(rows, gap):
+    grid = []
+    for i in range(rows):
+        grid.append([])
+        for j in range(rows):
+            spot = Spot(i, j, gap, rows)
+            grid[i].append(spot)
+    return grid
+
+def draw_grid_lines(win, rows, gap, true_size):
+    for i in range(rows + 1):
+        pygame.draw.line(win, GREY, (0, i * gap + UI_OFFSET), (true_size, i * gap + UI_OFFSET))
+        pygame.draw.line(win, GREY, (i * gap, UI_OFFSET), (i * gap, true_size + UI_OFFSET))
+
+def reset_search_visuals(grid):
+    for row in grid:
+        for spot in row:
+            if spot.is_closed() or spot.is_open() or spot.color == GREEN:
+                spot.reset()
+
+def draw_ui(win, mode, heur, dynamic, expanded, cost, time_ms, rows, true_size):
+    pygame.draw.rect(win, DARK_BG, (0, 0, true_size, UI_OFFSET))
+    
+    texts_left = [
+        "--- USER TOGGLES & CONTROLS ---",
+        f"[A / G] Active Algorithm: {mode}",
+        f"[H] Active Heuristic: {heur}",
+        f"[D] Dynamic Mode: {'ON' if dynamic else 'OFF'}",
+        f"[+ / -] Grid Size: {rows}x{rows}",
+        "[R] 30% Random Map | [C] Clear | [SPACE] Start"
+    ]
+    for i, text in enumerate(texts_left):
+        font = TITLE_FONT if i == 0 else FONT
+        render = font.render(text, True, WHITE)
+        win.blit(render, (15, 10 + (i * 22)))
+
+    texts_right = [
+        "--- REAL-TIME METRICS ---",
+        f"Nodes Expanded (Visited): {expanded}",
+        f"Final Path Cost: {cost} steps",
+        f"Live Compute Time: {time_ms:.3f} ms"
+    ]
+    
+    right_x = min(350, true_size - 300) 
+    for i, text in enumerate(texts_right):
+        font = TITLE_FONT if i == 0 else BOLD_FONT
+        render = font.render(text, True, GREEN)
+        win.blit(render, (max(20, right_x), 10 + (i * 22)))
+
+    legend = [
+        ("Orange: Start", ORANGE), ("Turquoise: Goal", TURQUOISE), 
+        ("Black: Wall", BLACK), ("Yellow: Frontier", YELLOW), 
+        ("Red: Visited", RED), ("Green: Path", GREEN)
+    ]
+    
+    x_offset = 15
+    for text, color in legend:
+        pygame.draw.rect(win, color, (x_offset, 150, 15, 15))
+        render = FONT.render(text, True, WHITE)
+        win.blit(render, (x_offset + 20, 148))
+        x_offset += 120
+
+def draw(win, grid, rows, gap, true_size, mode, heur, expanded, cost, time_ms, dynamic):
+    win.fill(WHITE)
+    for row in grid:
+        for spot in row:
+            spot.draw(win)
+            
+    draw_grid_lines(win, rows, gap, true_size)
+    pygame.draw.rect(win, BLACK, (0, UI_OFFSET, true_size, true_size), 4) 
+    draw_ui(win, mode, heur, dynamic, expanded, cost, time_ms, rows, true_size)
+    pygame.display.update()
+
+def get_clicked_pos(pos, gap, true_size):
+    y, x = pos
+    if y < UI_OFFSET or y >= UI_OFFSET + true_size or x < 0 or x >= true_size: 
+        return None, None
+    row = (y - UI_OFFSET) // gap
+    col = x // gap
+    return row, col
+
+def print_path_metrics(path, cost, expanded, mode):
+    print(f"\n[{mode}] --- PATHFINDING COMPLETE ---")
+    if path:
+        path_coords = [(spot.row, spot.col) for spot in path]
+        print(f"Path List (Row, Col Coordinates):")
+        print(path_coords)
+        print(f"Total Path Cost: {cost} steps")
+        print(f"Total Nodes Expanded: {expanded}")
+    else:
+        print("NO PATH FOUND. The goal is completely blocked.")
+    print("--------------------------------------\n")
