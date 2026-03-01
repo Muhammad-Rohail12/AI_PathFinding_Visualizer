@@ -264,3 +264,191 @@ def print_path_metrics(path, cost, expanded, mode):
     else:
         print("NO PATH FOUND. The goal is completely blocked.")
     print("--------------------------------------\n")
+
+# ==========================================
+# 5. MAIN EVENT LOOP
+# ==========================================
+def main(starting_rows):
+    ROWS = starting_rows 
+    
+    gap = BASE_WIDTH // ROWS
+    true_size = gap * ROWS
+    WIN = pygame.display.set_mode((true_size, true_size + UI_OFFSET))
+    pygame.display.set_caption("AI Dynamic Pathfinding Agent - Full Implementation")
+    
+    grid = make_grid(ROWS, gap)
+
+    start = None
+    end = None
+    run = True
+    
+    mode = "A*"
+    heuristic_type = "Manhattan"
+    dynamic_mode = False
+    
+    n_expanded = 0
+    p_cost = 0
+    e_time = 0.0
+
+    while run:
+        draw(WIN, grid, ROWS, gap, true_size, mode, heuristic_type, n_expanded, p_cost, e_time, dynamic_mode)
+        
+        def draw_realtime(live_expanded, live_cost, live_time):
+            draw(WIN, grid, ROWS, gap, true_size, mode, heuristic_type, live_expanded, live_cost, live_time, dynamic_mode)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+
+            if pygame.mouse.get_pressed()[0]: 
+                pos = pygame.mouse.get_pos()
+                row, col = get_clicked_pos((pos[1], pos[0]), gap, true_size)
+                if row is not None and col is not None and 0 <= row < ROWS and 0 <= col < ROWS:
+                    spot = grid[row][col]
+                    if not start and spot != end:
+                        start = spot
+                        start.make_start()
+                    elif not end and spot != start:
+                        end = spot
+                        end.make_end()
+                    elif spot != end and spot != start:
+                        spot.make_barrier()
+
+            elif pygame.mouse.get_pressed()[2]: 
+                pos = pygame.mouse.get_pos()
+                row, col = get_clicked_pos((pos[1], pos[0]), gap, true_size)
+                if row is not None and col is not None and 0 <= row < ROWS and 0 <= col < ROWS:
+                    spot = grid[row][col]
+                    spot.reset()
+                    if spot == start: start = None
+                    if spot == end: end = None
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_a: mode = "A*"
+                if event.key == pygame.K_g: mode = "GBFS"
+                if event.key == pygame.K_h: 
+                    heuristic_type = "Euclidean" if heuristic_type == "Manhattan" else "Manhattan"
+                if event.key == pygame.K_d: dynamic_mode = not dynamic_mode
+                
+                if event.key in [pygame.K_EQUALS, pygame.K_KP_PLUS, pygame.K_MINUS, pygame.K_KP_MINUS]:
+                    old_rows = ROWS
+                    
+                    if event.key in [pygame.K_EQUALS, pygame.K_KP_PLUS]:
+                        ROWS = min(ROWS + 5, 100) 
+                    else:
+                        ROWS = max(ROWS - 5, 10)  
+                        
+                    if ROWS != old_rows:
+                        n_expanded = p_cost = e_time = 0
+                        gap = BASE_WIDTH // ROWS
+                        true_size = gap * ROWS
+                        WIN = pygame.display.set_mode((true_size, true_size + UI_OFFSET)) 
+                        
+                        new_grid = make_grid(ROWS, gap)
+                        new_start = None
+                        new_end = None
+                        
+                        for i in range(old_rows):
+                            for j in range(old_rows):
+                                old_spot = grid[i][j]
+                                
+                                if old_spot.is_barrier() or old_spot == start or old_spot == end:
+                                    new_i = min(int((i / old_rows) * ROWS), ROWS - 1)
+                                    new_j = min(int((j / old_rows) * ROWS), ROWS - 1)
+                                    new_spot = new_grid[new_i][new_j]
+                                    
+                                    if old_spot == start and not new_start:
+                                        new_spot.make_start()
+                                        new_start = new_spot
+                                    elif old_spot == end and not new_end:
+                                        new_spot.make_end()
+                                        new_end = new_spot
+                                    elif old_spot.is_barrier() and new_spot != new_start and new_spot != new_end:
+                                        new_spot.make_barrier()
+                                        
+                        grid = new_grid
+                        start = new_start
+                        end = new_end
+                
+                if event.key == pygame.K_c:
+                    start = end = None
+                    n_expanded = p_cost = e_time = 0
+                    grid = make_grid(ROWS, gap)
+
+                if event.key == pygame.K_r:
+                    for row in grid:
+                        for spot in row:
+                            if spot != start and spot != end: spot.reset()
+                    for row in grid:
+                        for spot in row:
+                            if spot.color == WHITE and random.random() < 0.3:
+                                spot.make_barrier()
+
+                if event.key == pygame.K_SPACE and start and end:
+                    for row in grid:
+                        for spot in row:
+                            spot.update_neighbors(grid)
+                            
+                    reset_search_visuals(grid)
+                    
+                    path, n_expanded, p_cost, e_time = algorithm(
+                        draw_realtime, grid, start, end, mode, heuristic_type
+                    )
+
+                    print_path_metrics(path, p_cost, n_expanded, mode)
+
+                    if path and dynamic_mode:
+                        current_idx = 0
+                        while current_idx < len(path):
+                            
+                            for anim_ev in pygame.event.get():
+                                if anim_ev.type == pygame.QUIT:
+                                    pygame.quit()
+                                    sys.exit()
+
+                            for p in path: p.make_path() 
+                            current_spot = path[current_idx]
+                            current_spot.make_start() 
+                            end.make_end()
+                            
+                            draw(WIN, grid, ROWS, gap, true_size, mode, heuristic_type, n_expanded, p_cost, e_time, dynamic_mode)
+                            pygame.time.delay(100) 
+                            
+                            if random.random() < 0.05:
+                                r_row, r_col = random.randint(0, ROWS-1), random.randint(0, ROWS-1)
+                                rand_spot = grid[r_row][r_col]
+                                
+                                if rand_spot != current_spot and rand_spot != end and not rand_spot.is_barrier():
+                                    rand_spot.make_barrier()
+                                    
+                                    if rand_spot in path[current_idx:]:
+                                        print("\n[!] DYNAMIC MODE: Collision detected on path! Recalculating...\n")
+                                        reset_search_visuals(grid)
+                                        
+                                        for row in grid:
+                                            for spot in row:
+                                                spot.update_neighbors(grid)
+                                                
+                                        start = current_spot 
+                                        
+                                        path, new_expanded, new_cost, new_time = algorithm(
+                                            draw_realtime, grid, start, end, mode, heuristic_type
+                                        )
+                                        e_time += new_time
+                                        n_expanded += new_expanded
+                                        p_cost = new_cost
+                                        
+                                        print_path_metrics(path, p_cost, n_expanded, mode + " (Recalculated)")
+
+                                        if not path:
+                                            break 
+                                            
+                                        current_idx = 0 
+                                        continue
+
+                            current_spot.make_path() 
+                            current_idx += 1
+                            
+                    pygame.event.clear()
+
+    pygame.quit()
