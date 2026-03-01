@@ -452,3 +452,22 @@ def main(starting_rows):
                     pygame.event.clear()
 
     pygame.quit()
+if __name__ == "__main__":
+    print("===============================================")
+    print("     AI DYNAMIC PATHFINDING INITIALIZATION      ")
+    print("===============================================\n")
+    
+    user_rows = 35 
+    while True:
+        try:
+            val = input("Please enter the desired grid size (e.g., enter '35' for a 35x35 grid): ")
+            user_rows = int(val)
+            if 5 <= user_rows <= 150:
+                print(f"\n[+] Success! Generating a {user_rows}x{user_rows} grid map...")
+                break
+            else:
+                print("[-] Please enter a reasonable grid size (between 5 and 150).")
+        except ValueError:
+            print("[-] Invalid input. Please type a whole number.")
+            
+    main(user_rows)
